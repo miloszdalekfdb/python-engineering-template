@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.clinical_note import ClinicalNote, NoteStatus
+from app.clinical_note import ClinicalNote
 from app.repository import InMemoryNoteRepository, NoteNotFoundError
 
 
