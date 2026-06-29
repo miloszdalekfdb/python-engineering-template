@@ -1,15 +1,21 @@
 """Tests for the API endpoints."""
 
+from collections.abc import Generator
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api import app
+from app.api import app, get_repository
+from app.repository import InMemoryNoteRepository
 
 
 @pytest.fixture
-def client() -> TestClient:
-    """Provide a test client for the API."""
-    return TestClient(app)
+def client() -> Generator[TestClient, None, None]:
+    """Provide a test client with a fresh repository for each test."""
+    test_repository = InMemoryNoteRepository()
+    app.dependency_overrides[get_repository] = lambda: test_repository
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 class TestHealthCheck:
@@ -41,8 +47,7 @@ class TestCreateNote:
         data = response.json()
         assert data["patient_id"] == "patient-001"
         assert data["status"] == "draft"
-        assert "note_id" in data
-        assert "created_at" in data
+        assert data["note_id"] == "note-0001"
         assert data["word_count"] == 4
 
     def test_create_note_empty_content_returns_422(self, client: TestClient) -> None:
@@ -96,6 +101,44 @@ class TestGetNote:
         response = client.get("/notes/note-9999")
 
         assert response.status_code == 404
+
+
+class TestListNotes:
+    """Tests for GET /notes."""
+
+    def test_list_notes_empty(self, client: TestClient) -> None:
+        """Empty repository should return empty list."""
+        response = client.get("/notes")
+
+        assert response.status_code == 200
+        assert response.json() == []
+
+    def test_list_notes_returns_all(self, client: TestClient) -> None:
+        """All created notes should appear in the list."""
+        client.post(
+            "/notes",
+            json={
+                "patient_id": "patient-001",
+                "clinician_id": "clinician-001",
+                "content": "First note.",
+            },
+        )
+        client.post(
+            "/notes",
+            json={
+                "patient_id": "patient-002",
+                "clinician_id": "clinician-002",
+                "content": "Second note.",
+            },
+        )
+
+        response = client.get("/notes")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["note_id"] == "note-0001"
+        assert data[1]["note_id"] == "note-0002"
 
 
 class TestFinaliseNote:

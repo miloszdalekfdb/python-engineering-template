@@ -80,10 +80,10 @@ class NoteService:
         """
         return self._repository.get_by_id(note_id)
 
-    def list_notes(self) -> list[ClinicalNote]:
-        """Return all notes.
+    def list_notes(self) -> list[tuple[str, ClinicalNote]]:
+        """Return all notes with their IDs.
 
         Returns:
-            List of all clinical notes.
+            List of (note_id, note) tuples.
         """
         return self._repository.list_all()

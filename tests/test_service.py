@@ -151,11 +151,15 @@ class TestListNotes:
         """Empty service should return empty list."""
         assert service.list_notes() == []
 
-    def test_list_notes_returns_all(self, service: NoteService) -> None:
-        """All created notes should appear in the list."""
+    def test_list_notes_returns_id_and_note_pairs(self, service: NoteService) -> None:
+        """All created notes should appear with their IDs."""
         service.create_note("patient-001", "clinician-001", "First note.")
         service.create_note("patient-002", "clinician-001", "Second note.")
 
-        notes = service.list_notes()
+        results = service.list_notes()
 
-        assert len(notes) == 2
+        assert len(results) == 2
+        assert results[0][0] == "note-0001"
+        assert results[0][1].content == "First note."
+        assert results[1][0] == "note-0002"
+        assert results[1][1].content == "Second note."

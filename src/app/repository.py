@@ -35,9 +35,9 @@ class InMemoryNoteRepository:
             raise NoteNotFoundError(note_id)
         return self._notes[note_id]
 
-    def list_all(self) -> list[ClinicalNote]:
-        """Return all stored notes."""
-        return list(self._notes.values())
+    def list_all(self) -> list[tuple[str, ClinicalNote]]:
+        """Return all stored notes as (id, note) pairs."""
+        return list(self._notes.items())
 
     def count(self) -> int:
         """Return the number of stored notes."""

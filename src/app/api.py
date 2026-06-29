@@ -1,6 +1,6 @@
 """FastAPI application and route handlers."""
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
 
 from app.clinical_note import ClinicalNote
 from app.repository import InMemoryNoteRepository, NoteNotFoundError
@@ -13,10 +13,21 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Application-level dependency setup
-# In production this would use proper dependency injection
-_repository = InMemoryNoteRepository()
-_service = NoteService(repository=_repository)
+
+def get_repository() -> InMemoryNoteRepository:
+    """Dependency provider for the note repository."""
+    return _default_repository
+
+
+def get_service(
+    repository: InMemoryNoteRepository = Depends(get_repository),
+) -> NoteService:
+    """Dependency provider for the note service."""
+    return NoteService(repository=repository)
+
+
+# Default repository for production use
+_default_repository = InMemoryNoteRepository()
 
 
 def _note_to_response(note_id: str, note: ClinicalNote) -> NoteResponse:
@@ -44,10 +55,13 @@ def health_check() -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
     responses={422: {"model": ErrorResponse}},
 )
-def create_note(request: CreateNoteRequest) -> NoteResponse:
+def create_note(
+    request: CreateNoteRequest,
+    service: NoteService = Depends(get_service),
+) -> NoteResponse:
     """Create a new clinical note."""
     try:
-        note_id, note = _service.create_note(
+        note_id, note = service.create_note(
             patient_id=request.patient_id,
             clinician_id=request.clinician_id,
             content=request.content,
@@ -66,10 +80,13 @@ def create_note(request: CreateNoteRequest) -> NoteResponse:
     response_model=NoteResponse,
     responses={404: {"model": ErrorResponse}},
 )
-def get_note(note_id: str) -> NoteResponse:
+def get_note(
+    note_id: str,
+    service: NoteService = Depends(get_service),
+) -> NoteResponse:
     """Retrieve a clinical note by ID."""
     try:
-        note = _service.get_note(note_id)
+        note = service.get_note(note_id)
     except NoteNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -80,10 +97,12 @@ def get_note(note_id: str) -> NoteResponse:
 
 
 @app.get("/notes", response_model=list[NoteResponse])
-def list_notes() -> list[NoteResponse]:
+def list_notes(
+    service: NoteService = Depends(get_service),
+) -> list[NoteResponse]:
     """List all clinical notes."""
-    # TODO: Fix repository to return (id, note) pairs
-    return []
+    notes = service.list_notes()
+    return [_note_to_response(note_id, note) for note_id, note in notes]
 
 
 @app.post(
@@ -91,10 +110,13 @@ def list_notes() -> list[NoteResponse]:
     response_model=NoteResponse,
     responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
-def finalise_note(note_id: str) -> NoteResponse:
+def finalise_note(
+    note_id: str,
+    service: NoteService = Depends(get_service),
+) -> NoteResponse:
     """Finalise a clinical note, locking it from further edits."""
     try:
-        note = _service.finalise_note(note_id)
+        note = service.finalise_note(note_id)
     except NoteNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
