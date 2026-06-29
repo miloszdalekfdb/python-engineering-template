@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Production Python project template for learning engineering best practices"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.138.2",
+    "httpx2>=2.5.0",
+    "uvicorn[standard]>=0.49.0",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -19,6 +23,7 @@ dev = [
     "mypy>=1.15.0",
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.ruff]
