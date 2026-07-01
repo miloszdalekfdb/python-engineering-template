@@ -10,6 +10,24 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: devpassword
+          POSTGRES_DB: clinical_notes
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://app:devpassword@localhost:5432/clinical_notes
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,6 +49,9 @@ jobs:
 
       - name: Type check
         run: uv run mypy src/
+
+      - name: Run migrations
+        run: uv run alembic upgrade head
 
       - name: Run tests
         run: uv run pytest
