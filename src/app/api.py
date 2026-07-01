@@ -1,11 +1,14 @@
 """FastAPI application and route handlers."""
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.async_service import AsyncNoteService
 from app.clinical_note import ClinicalNote
-from app.repository import InMemoryNoteRepository, NoteNotFoundError
+from app.database import get_db_session
+from app.db_repository import PostgresNoteRepository
+from app.repository import NoteNotFoundError
 from app.schemas import CreateNoteRequest, ErrorResponse, NoteResponse
-from app.service import NoteService
 
 app = FastAPI(
     title="Clinical Notes API",
@@ -14,20 +17,18 @@ app = FastAPI(
 )
 
 
-def get_repository() -> InMemoryNoteRepository:
+def get_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> PostgresNoteRepository:
     """Dependency provider for the note repository."""
-    return _default_repository
+    return PostgresNoteRepository(session=session)
 
 
 def get_service(
-    repository: InMemoryNoteRepository = Depends(get_repository),
-) -> NoteService:
+    repository: PostgresNoteRepository = Depends(get_repository),
+) -> AsyncNoteService:
     """Dependency provider for the note service."""
-    return NoteService(repository=repository)
-
-
-# Default repository for production use
-_default_repository = InMemoryNoteRepository()
+    return AsyncNoteService(repository=repository)
 
 
 def _note_to_response(note_id: str, note: ClinicalNote) -> NoteResponse:
@@ -44,7 +45,7 @@ def _note_to_response(note_id: str, note: ClinicalNote) -> NoteResponse:
 
 
 @app.get("/health", status_code=status.HTTP_200_OK)
-def health_check() -> dict[str, str]:
+async def health_check() -> dict[str, str]:
     """Health check endpoint for monitoring."""
     return {"status": "healthy"}
 
@@ -55,13 +56,13 @@ def health_check() -> dict[str, str]:
     status_code=status.HTTP_201_CREATED,
     responses={422: {"model": ErrorResponse}},
 )
-def create_note(
+async def create_note(
     request: CreateNoteRequest,
-    service: NoteService = Depends(get_service),
+    service: AsyncNoteService = Depends(get_service),
 ) -> NoteResponse:
     """Create a new clinical note."""
     try:
-        note_id, note = service.create_note(
+        note_id, note = await service.create_note(
             patient_id=request.patient_id,
             clinician_id=request.clinician_id,
             content=request.content,
@@ -80,13 +81,13 @@ def create_note(
     response_model=NoteResponse,
     responses={404: {"model": ErrorResponse}},
 )
-def get_note(
+async def get_note(
     note_id: str,
-    service: NoteService = Depends(get_service),
+    service: AsyncNoteService = Depends(get_service),
 ) -> NoteResponse:
     """Retrieve a clinical note by ID."""
     try:
-        note = service.get_note(note_id)
+        note = await service.get_note(note_id)
     except NoteNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -97,11 +98,11 @@ def get_note(
 
 
 @app.get("/notes", response_model=list[NoteResponse])
-def list_notes(
-    service: NoteService = Depends(get_service),
+async def list_notes(
+    service: AsyncNoteService = Depends(get_service),
 ) -> list[NoteResponse]:
     """List all clinical notes."""
-    notes = service.list_notes()
+    notes = await service.list_notes()
     return [_note_to_response(note_id, note) for note_id, note in notes]
 
 
@@ -110,13 +111,13 @@ def list_notes(
     response_model=NoteResponse,
     responses={404: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
-def finalise_note(
+async def finalise_note(
     note_id: str,
-    service: NoteService = Depends(get_service),
+    service: AsyncNoteService = Depends(get_service),
 ) -> NoteResponse:
     """Finalise a clinical note, locking it from further edits."""
     try:
-        note = service.finalise_note(note_id)
+        note = await service.finalise_note(note_id)
     except NoteNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -5,8 +5,12 @@ description = "Production Python project template for learning engineering best 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
     "fastapi>=0.138.2",
     "httpx2>=0.4.1",
+    "pydantic-settings>=2.14.2",
+    "sqlalchemy[asyncio]>=2.0.51",
     "uvicorn[standard]>=0.49.0",
 ]
 
@@ -30,6 +34,7 @@ dev = [
 target-version = "py312"
 src = ["src"]
 line-length = 88
+extend-exclude = ["alembic"]
 
 [tool.ruff.lint]
 select = [
@@ -52,6 +57,7 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+exclude = ["alembic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
